@@ -72,15 +72,6 @@ The EM algorithm then alternates between these two steps. In the E step, we comp
 using the parameters $$\boldsymbol{\theta}^{old}$$ from the previous iteration. In the M step, we maximize the expectation
 $$(\ref{eq:expectation_complete_data_likelihood})$$, with respect to $$\boldsymbol{\theta}$$.
 
-![](https://i.imgur.com/7jupFqs.jpg)
-*Excellent visualization of the EM algorithm (adapted from ([Bishop 2006](https://www.springer.com/gp/book/9780387310732)))*
-*showing each stage of the EM algorithm iteration. Frist, on the left, pre-E-step, the KL divergence*
-*between $$q$$ and $$p$$ is non-zero, and there is a mismatch between the VLB and the log likelihood.*
-*Post E-step (middle), $$q$$ is exactly equal to the posterior at the current parameter set $$\boldsymbol{\theta}$$,*
-*and the VLB is equal to the log-lokelihood. Post M-step (right), is when the VLB is maximized w.r.t $$\boldsymbol{\theta}$$,*
-*this causes the VLB to increase, and the log-likelihood to increase even more, since the KL divergence $$KL(q \vert p)$$ is*
-*no longer zero with the new parameters.*
-
 ## EM and the VLB
 
 Having build our intuition of how the algorithm works, we can give it a more formal treatment, and find out why our 
@@ -153,6 +144,15 @@ With $$q(\boldsymbol{Z})=p(\boldsymbol{Z} \vert \boldsymbol{X}, \boldsymbol{\the
 is exactly equal to the quantity $$\mathcal{Q}(\boldsymbol{\theta}, \boldsymbol{\theta}^{old})$$ in $$(\ref{eq:expectation_complete_data_likelihood})$$.
 Therefore maximizing $$(\ref{eq:expectation_complete_data_likelihood})$$ w.r.t $$\boldsymbol{\theta}$$ is equivalent to 
 maximizing the VLB.
+
+![](https://i.imgur.com/7jupFqs.jpg)
+*Excellent visualization of the EM algorithm (adapted from ([Bishop 2006](https://www.springer.com/gp/book/9780387310732)))*
+*showing each stage of the EM algorithm iteration. Frist, on the left, pre-E-step, the KL divergence*
+*between $$q$$ and $$p$$ is non-zero, and there is a mismatch between the VLB and the log likelihood.*
+*Post E-step (middle), $$q$$ is exactly equal to the posterior at the current parameter set $$\boldsymbol{\theta}$$,*
+*and the VLB is equal to the log-lokelihood. Post M-step (right), is when the VLB is maximized w.r.t $$\boldsymbol{\theta}$$,*
+*this causes the VLB to increase, and the log-likelihood to increase even more, since the KL divergence $$KL(q \vert p)$$ is*
+*no longer zero with the new parameters.*
 
 ## Making EM more tractable - Variational Posteriors
 
