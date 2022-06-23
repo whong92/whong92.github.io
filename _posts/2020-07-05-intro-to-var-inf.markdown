@@ -18,7 +18,7 @@ So here goes.
 
 In many classes of machine learning problems, the problem can be framed as one is interested in finding a probability distribution $$p(Z,X)$$ to explain some data $$X$$, where $$Z$$ is a latent factor governing $$X$$. In many cases, there is also a parameter set $$\boldsymbol{\theta}$$ governing the relationship between $$Z$$ and $$X$$.
 
-\<Put a simple graphical model here.\>
+![](https://i.imgur.com/gzeHBNt.png)
 
 A popular example is the Gaussian Mixture Model, which describes a mixture of $$k$$ gaussians, with means and variances $$\boldsymbol{\mu_k}, \boldsymbol{\Sigma_k}$$, and a multinomial with coefficients $$\pi_k$$, where:
 
@@ -34,7 +34,7 @@ $$
 
 In many cases this is infeasible to solve for exactly, possibly due to the high dimensionality of the latent factors $$Z$$, or the analytic intractibility of evaluating and maximizing $$\log \int{p(X,Z)}dZ$$.
 
-For GMM's this is solved by utilizing the EM algorithm (insert link here), to approximately maximize $$p(X)$$, w.r.t to the gaussian and multinomial parameters, via an alternating maximization of a lower bound while holding the posterior $$p(Z\|X,\theta)$$ constant, and maximizing for $$\theta$$, and vice versa. This may be tractable for the GMM's but in general evaluating $$p(Z\|X,\theta)$$ may still be problematic as it still involves computing $$\int{p(X,Z)}dZ$$ in one form or another.
+For GMM's this is solved by utilizing the [EM algorithm](https://www.econstor.eu/bitstream/10419/22198/1/24_tk_gm_skn.pdf), to approximately maximize $$p(X)$$, w.r.t to the gaussian and multinomial parameters, via an alternating maximization of a lower bound while holding the posterior $$p(Z\|X,\theta)$$ constant, and maximizing for $$\theta$$, and vice versa. This may be tractable for the GMM's but in general evaluating $$p(Z\|X,\theta)$$ may still be problematic as it still involves computing $$\int{p(X,Z)}dZ$$ in one form or another.
 
 Variational Inference gives a solution by attemping to model such complicated distributions by 'fitting' it with a class of simpler distributions, in order to make computing the above quantities mathematically tractable.
 

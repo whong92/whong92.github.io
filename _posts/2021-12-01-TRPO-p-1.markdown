@@ -1,0 +1,372 @@
+---
+layout: post_math
+title:  "Trust Region Policy Optimization: Monotonic Improvement"
+date:   2021-12-01 00:28:26 +0100
+author_profile: true
+toc: true
+classes: wide
+categories: reinforcement-learning
+---
+
+In this post we'll be talking about the famed [Trust Region Policy Optimization (TRPO)](https://arxiv.org/abs/1502.05477) paper. 
+It's a relatively dense paper filled with a ton of interesting and important results, and the aim of this post is to do a deep dive
+on the main results of the paper. One post doesn't do the paper justice, and so this will be the first of a multi-part 
+post. This post assumes some basic knowledge of MDP's, Reinforcement Learning and associated notation conventions.
+
+In this first part, I'll be focusing on the main theoretical result of the paper, which I'll call the Monotonic Improvement
+Guarantee Theorem (MIGT), after the section it was written under in the paper. This result forms the foundation of all
+the techniques that follow in the paper and those in other papers that derive from it (for example the [Proximal 
+Policy Optimization](https://arxiv.org/abs/1707.06347) paper).
+
+This theorem, which we'll get to after (shown in equation \ref{MIGT}) we've covered some preliminaries, essentially
+gives a lower bound function that's easy (relatively) to optimize. Optimizing this lower bound can essentially guarantee
+monotic policy improvement over the entire state space, even under function approximation.
+
+This post will follow the notation in the original paper, but here are some important ones just in case:
+
+$$ r(s,a) $$ : the reward function following an action $$a$$ taken at state $$s$$
+
+$$ \rho_0 $$ : distribution of the initial state $$s_0$$
+
+$$ \pi, \eta(\pi) $$ : stochastic policy, and the expected return function of the policy, $$ \eta(\pi) $$ can
+be written:
+
+$$ \eta(\pi) = \mathbb{E}_{s_0, a_0, s_1 ...} \sum_{t=0}^{\infty} \gamma^t r(s_t) $$
+
+$$ \tau \sim \pi $$ : trajectory $$ \{s_0, a_0, s_1 ...\} $$ generated from policy $$ \pi $$
+
+## The Advantage Function and Policy Update Equation 
+
+Given the action / state value function for $$ \pi $$, $$ Q_{\pi}(s, a) $$ / $$ V_{\pi}(s, a) $$ the advantage
+function $$ A_{\pi}(s, a) $$ is given as:
+
+$$ A_{\pi}(s, a) = Q_{\pi}(s, a) - V_{\pi}(s) $$
+
+Which expresses the potential excess return when taking action $$ a $$ at state $$ s $$ over following the policy
+$$ \pi $$. This term appears in the [actor-critic + baseline](http://rail.eecs.berkeley.edu/deeprlcourse-fa17/f17docs/lecture_5_actor_critic_pdf)
+algorithm.
+
+The policy update equation relates the expected return of a new policy following a policy  update$$ \pi \rightarrow 
+\tilde{\pi} $$, (first derived in [Kakade and Langford (2002)](https://dl.acm.org/doi/10.5555/645531.656005)) 
+
+\begin{equation}\label{policy-update-equation}
+\eta(\tilde{\pi}) = \eta(\pi) +  \mathbb{E}_{\tau \sim \tilde{\pi}} \left[ \sum\_{t=0}^{\infty} \gamma^{t} A\_{\pi}(s_t, a_t)  \right]
+\end{equation}
+
+(\ref{policy-update-equation}) is a crucial result, as $$ \eta(\tilde{\pi}) $$ is the objective we'll seek to model (and
+maximize) in order to guarantee monotonic policy improvement. It's worth noticing what the second term represents: the expected
+advantage if we choose actions according to $$ \tilde{\pi} $$ instead of $$ \pi $$. Walking through the proof of
+(\ref{policy-update-equation}) is relatively straightforward.
+
+First, note that the advantage function can be written: 
+
+$$ A_{\pi}(s, a) = \mathbb{E}_{s' \sim P(s'\|s,a)} [r(s) + \gamma V_{\pi}(s') - V_{\pi}(s) ] $$
+
+So,
+
+$$
+\mathbb{E}_{\tau \sim \tilde{\pi}} \left[ \sum_{t=0} \gamma^t A_{\pi}(s_t, a_t) \right] \\
+= \mathbb{E}_{\tau \sim \tilde{\pi}}[ \sum_{t=0} \gamma^t (r(s_t) + \gamma V_{\pi}(s_{t+1}) - V_{\pi}(s_t))]
+$$
+
+In the second line the equation above, notice that the terms $$ \gamma V_{\pi}(s_{t+1}) $$ and $$ V_{\pi}(s_t) $$
+cancel out for consecutive $$ t $$, except for $$ t=0 $$, which leaves us only with a single $$ -V_{\pi}(s_0) $$. Basically
+only the reward terms from the trajectory of $$ \tilde{\pi} $$ survive:
+
+$$
+\mathbb{E}_{\tau \sim \tilde{\pi}}[  -V_{\pi}(s_0) + \sum_{t=0} \gamma^t r(s_t)] \\
+= -\mathbb{E}_{s_0}[V_{\pi}(s_0)] + \mathbb{E}_{\tau \sim \tilde{\pi}}[\sum_{t=0} \gamma^t r(s_t)] \\
+= -\eta(\pi) + \eta(\tilde{\pi}) 
+$$
+
+Which proves (\ref{policy-update-equation}).
+
+We can look at (\ref{policy-update-equation}) more concisely by introducing the discounted visitation frequencies:
+
+$$
+\rho_{\pi}(s) = P(s_0=s) + \gamma P(s_1=s) + \gamma^2 P(s_2=s) ...
+$$
+
+And write:
+
+$$
+\eta(\tilde{\pi}) = \eta(\pi) +  \mathbb{E}_{\tau \sim \tilde{\pi}} \left[ \sum_{t=0}^{\infty} \gamma^{t} A_{\pi}(s_t, a_t)  \right] \\
+= \eta(\pi) + \sum_t \sum_s P(s_t=s \| \tilde{\pi}) \sum_a \tilde{\pi}(a \| s) \gamma^t  A_{\pi}(s_t, a_t) \\
+= \eta(\pi) + \sum_s \sum_t \gamma^t P(s_t=s \| \tilde{\pi}) \sum_a \tilde{\pi}(a \| s) A_{\pi}(s_t, a_t) \\
+= \eta(\pi) + \sum_s \rho_{\tilde{\pi}}(s) \sum_a \tilde{\pi}(a \| s)  A_{\pi}(s_t, a_t)
+$$
+
+The original paper notes that if we can guarantee a nonnegative expacted advantage at every state $$ s $$, we
+are guaranteed to improve policy performance $$ \eta $$. In a tabular setting where states and actions do not
+share any representation, this is entirely possible. In exact policy iteration which uses the deterministic policy:
+$$ \tilde{\pi}(s) \arg \max_a A_{\pi}(s,a) $$, if there exists one state-action pair $$s^*, a^*$$ that is nonnegative,
+we can always improve the policy, as $$ \sum_a \tilde{\pi}(a \| s) A_{\pi} (s,a) > 0 $$ for that state action pair,
+and $$ \sum_a \tilde{\pi}(a \| s) A_{\pi} (s,a) = 0 $$ for all others. This is the classic policy improvement theorem.
+
+
+The central difficulty with function approximation is that this property cannot be guaranteed, as states and actions
+share representation, and interact in complex ways. We cannot guarantee improving one state's expected advantage will not
+result in another state's being harmed. We need to consider the *entire* space of states when performing policy improvement
+with function approximation, and optimize $$\eta$$ as a whole. Unfortunately, this is very difficult to do due to the
+complex dependency of $$\eta(\tilde{\pi})$$ through $$\rho_{\tilde{\pi}}$$.
+
+
+## Conservative Policy Iteration
+
+When [Kakade and Langford (2002)](https://dl.acm.org/doi/10.5555/645531.656005) first introduced the policy update equation,
+they introduced a local approximation to the Policy Update Equation. This alleviates the difficulty of optimizing $$ \tilde{\pi} $$
+w.r.t (\ref{policy-update-equation}) which depends on $$ \rho_{\tilde{\pi}} $$. The local approximation is given:
+
+\begin{equation}
+L_{\pi}(\tilde{\pi}) = \eta(\pi) + \sum_s \rho_{\pi}(s) \sum_a \tilde{\pi}(a \| s)  A_{\pi}(s_t, a_t)
+\end{equation}
+
+Where $$ \rho_{\tilde{\pi}}(s) $$ is replaced with the visitation frequency of the old policy $$ \pi $$. Note that:
+$$
+L_{\pi}(\pi) = \eta(\pi)
+$$
+
+So now there's only one term in $$ L_{\pi}(\tilde{\pi}) $$ that depends on $$ \tilde{\pi} $$ - that's $$ \tilde{\pi}(a \| s) $$ itself.
+This makes it much more algebraically tractable for parametrized policies. Considering parametrized policies 
+$$\pi_{\theta}(a\|s)$$ which is a differentiable function w.r.t $$\theta$$, in a small region around some parameter
+value $$\theta_0$$, $$L_{\pi}$$ matches $$\eta$$ to first order in the neighborhood around $$\theta_0$$:
+
+$$
+L_{\pi_{\theta_0}}(\pi_{\theta_0}) = \eta(\pi_{\theta_0}) \\
+\nabla_{\theta} L_{\pi_{\theta_0}}(\pi_{\theta}) \|_{\theta = \theta_0} = \nabla_{\theta} \eta(\pi_{\theta}) \|_{\theta = \theta_0} \\
+$$
+
+This implies that $$L_{\pi_{\theta_0}}$$ and $$\eta$$ have similar values and similar slope around $$\theta_0$$, and gradient
+descent performed on $$L_{\pi_{\theta}}$$ will also improve $$ \eta(\pi_{\theta}) $$, given sufficiently small step size.
+
+![](https://i.imgur.com/dsWl2wN.jpg)
+*Illustration of what $$\eta$$ and $$L_{\pi}$$ may look like for a one-dimensional parametrized policy around $$\theta_0$$. 
+The green slope shows that the gradient of both functions should be similar in the region around $$\theta_0$$*
+
+## Expected Advantage $$ \bar{A}(s) $$ at State $$ s $$
+
+The advantage function can be taken over states (as opposed to state-action pairs), this is the average excess return one
+can expect, starting from state $$ s $$ whilst following policy $$ \tilde{\pi} $$, over the policy $$ \pi $$. We can write
+
+$$
+\bar{A}_{\tilde{\pi}, \pi}(s) = \mathbb{E}_{a \sim \tilde{\pi}(.\|s)} [A_{\pi}(s, a)]
+$$
+
+The Policy Update Equation, and the Local Approximation $$ L_{\pi} $$ to $$ \eta $$ can be written in terms of $$ \bar{A}(s)$$ 
+(we can omit the subscript $$ \{\tilde{\pi}, \pi\} $$ as this is implicit in the definition:
+
+$$
+\eta(\tilde{\pi}) = \eta(\pi) + \mathbb{E}_{\tau \sim \tilde{\pi}} \left[ \sum_{t=0}^{\infty} \gamma^t \bar{A}(s_t) \right]
+$$
+
+$$
+L_{\pi}(\tilde{\pi}) = \eta(\pi) + \mathbb{E}_{\tau \sim \pi} \left[ \sum_{t=0}^{\infty} \gamma^t \bar{A}(s_t) \right]
+$$
+
+As we will soon see, the expected advantage function has some nice bounds, which can in turn be used to bound $$ L_{\pi} $$.
+
+
+## $$ \alpha $$-coupled Policies
+
+Central to the derivation of the TRPO bounds is the idea of an $$ \alpha $$-coupled policy pair. The paper defines
+$$ (\pi, \tilde{\pi}) $$ as an $$\alpha$$-coupled policy pair if $$P(a \neq \tilde{a} \| s) \leq \alpha$$ for all $$ s $$. 
+Put simply, the actions of the pair $$ (\pi, \tilde{\pi}) $$ must agree at least a proportion $$\alpha$$ of the time.
+
+$$\alpha$$ coupled policies are also related to the total-variation divergence between two discrete probability distributions
+$$p$$ and $$q$$: 
+$$D_{TV}(p \| q) = \frac{1}{2} \sum_i \| p_i - q_i \|$$
+
+A result from [Levin et al (2009)](https://pages.uoregon.edu/dlevin/MARKOV/markovmixing.pdf) gives the following relationship 
+between $$ \alpha $$-coupled policies and the total variation divergence:
+
+_Suppose $$p_X$$ and $$p_Y$$ are distributions with $$D_{TV}(p_X \| p_Y) = \alpha$$, then there exists a joint distribution
+whose marginals are $$p_X,p_Y$$, for which $$X=Y$$ with probability $$1-\alpha$$_
+
+So if two policies are $$\alpha$$-coupled, it implies that the $$D_{TV}$$ for those policies are less than or equal to $$\alpha$$
+for all states $$s$$, and vice-versa. Therefore, if we have $$\alpha = \max_s D_{TV}(\pi(.\|s) \| \tilde{\pi}(.\|s))$$, 
+then $$ (\pi, \tilde{\pi}) $$ is an $$\alpha$$ coupled policy pair. This identity will come in handy in the final part of the 
+proof.
+
+One last property of $$\alpha$$-coupled policy pairs, is that a bound can be derived on the expected advantage function
+$$ \bar{A}(s) $$. The intuition here is that since the policy pair $$ (\pi, \tilde{\pi}) $$ agree $$ 1 - \alpha $$ of the
+time, the relative advantage is zero when they agree. It's only when the policies don't agree (on the choices of actions
+taken), that we need to sum up the advantage of  $$ \tilde{\pi} $$ over $$\pi$$.
+
+![](https://i.imgur.com/RFnEzh7.jpg)
+*Image to visualize the joint distribution of $$\alpha$$ and $$\tilde{\alpha}$$, for a space of 10 possible actions, 
+given a fixed $$s$$. Here the green diagonal is when $$\alpha$$ and  and $$\tilde{\alpha}$$ agree. Shown on the right are
+values of the joint distribution and difference in advantage functions, the latter of which equates to zero on the green
+diagonal.*
+
+First, we note that $$ \bar{A}(s) $$ can be written as a difference between the advantage functions of
+$$\pi$$ and $$\tilde{\pi}$$, Given that 
+
+$$ \bar{A}_{\pi, \pi}(s) = \mathbb{E}_{a \sim \pi} [A_{\pi}(s,a)] = 0$$
+
+we can write:
+
+$$
+\bar{A}(s) = \mathbb{E}_{\tilde{a} \sim \tilde{\pi}} [A_{\pi}(s,\tilde{a})] \\
+= \mathbb{E}_{\tilde{a} \sim \tilde{\pi}} [A_{\pi}(s,\tilde{a})] - \mathbb{E}_{a \sim \pi} [A_{\pi}(s,a)] \\
+= \mathbb{E}_{\tilde{a}, a \sim \tilde{\pi}, \pi} [A_{\pi}(s,\tilde{a}) - A_{\pi}(s,a)] \\
+= P(a \neq \tilde{a} \| s) \mathbb{E}_{\tilde{a}, a \sim \tilde{\pi}, \pi \| a \neq \tilde{a}} [A_{\pi}(s,\tilde{a}) - A_{\pi}(s,a)]
+$$
+
+In the last line above, the advantage functions cancel out when $$ P(a = \tilde{a} \| s) $$, for $$\alpha$$-coupled policies,
+this probability is bounded by $$1 - \alpha$$, the difference between the advantage functions are also bounded by 
+$$2\max_a \| A_{\pi}(s,a) \|$$. Taken together, this gives a bound on the expected advantage:
+
+\begin{equation} \label{expected-advantage-bound}
+\bar{A}(s) \leq 2 \alpha \max_a \| A\_{\pi}(s,a) \|
+\end{equation}
+
+## Bounds on the Difference between Expected Advantage
+
+We're nearly there! One last piece of the puzzle is to figure out a bound on the difference between the two
+expected advantage functions shown below:
+$$
+\| \mathbb{E}_{s \sim \tilde{\pi}}[\bar{A}(s)] - \mathbb{E}_{s \sim \pi}[\bar{A}(s)] \|
+$$
+
+The reason is that this term appears when we subtract $$L_{\pi}(\tilde{\pi})$$ from $$\eta(\tilde{\pi})$$, and this will
+help us derive a bound on the local approximation error for $$L_{\pi}(\tilde{\pi})$$
+
+$$
+L_{\pi}(\tilde{\pi}) - \eta(\tilde{\pi}) = 
+\sum_{t=0}^{\infty} \gamma^t  \left[ 
+\mathbb{E}_{\tau \sim \tilde{\pi}}[\bar{A}(s)] - 
+\mathbb{E}_{\tau \sim \pi}[\bar{A}(s)]
+\right]
+$$
+
+One simple bound we can immediately derive with the existing results (using (\ref{expected-advantage-bound})) is:
+
+$$
+\| \mathbb{E}_{s \sim \tilde{\pi}}[\bar{A}(s)] - \mathbb{E}_{s \sim \pi}[\bar{A}(s)] \|
+\leq \| \mathbb{E}_{s \sim \tilde{\pi}}[\bar{A}(s)]\| + \|\mathbb{E}_{s \sim \pi}[\bar{A}(s)] \| \\
+\leq \max_s \| \bar{A}(s) \| + \max_s \| \bar{A}(s) \| \\
+= 2 \max_s \| \bar{A}(s) \|
+$$
+
+To get to this simple bound, we use (\ref{expected-advantage-bound})
+\begin{equation}\label{simple-bound}
+\| \mathbb{E}\_{s \sim \tilde{\pi}}[\bar{A}(s)] - \mathbb{E}\_{s \sim \pi}[\bar{A}(s)] \|
+\leq 4 \alpha \max\_{s, a} \| A\_{\pi}(s,a) \|
+\end{equation}
+
+And this is actually a valid bound, it is a looser bound than the one derived in the paper. To make this bound tighter,
+we need to use some intuition on the expected differences between the advantage functions again. If we imagine all possible
+trajectories from $$\tilde{\tau} \sim \tilde{\pi}$$ and $$\tau \sim \pi$$, we can decompose the expectation into two parts,
+depending on if these trajectories agree with each other or not. This is very similar to the idea used in the derivation of
+(\ref{expected-advantage-bound}), except now, we are considering entire trajectories instead of individual actions.
+
+Let $$n_t$$ denote the number of times that $$a_i \neq \tilde{a}_i$$ for all $$i < t$$, which is the number of times $$ \pi $$
+and $$ \tilde{\pi} $$ disagree on the actions before the current timestep $$t$$, then:
+
+$$
+\mathbb{E}_{s_t \sim \tilde{\pi}}[\bar{A}(s_t)] =
+P(n_t=0) \mathbb{E}_{s_t \sim \tilde{\pi} \| n_t=0}[\bar{A}(s_t)]
++ P(n_t>0) \mathbb{E}_{s_t \sim \tilde{\pi} \| n_t>0}[\bar{A}(s_t)]
+$$
+
+The same can be done for the expectation under $$\pi$$:
+
+$$
+\mathbb{E}_{s_t \sim \pi}[\bar{A}(s_t)] =
+P(n_t=0) \mathbb{E}_{s_t \sim \pi \| n_t=0}[\bar{A}(s_t)] 
++ P(n_t>0) \mathbb{E}_{s_t \sim \pi \| n_t>0}[\bar{A}(s_t)]
+$$
+
+In those cases where $$\pi$$ and $$\tilde{\pi}$$ agree, $$n_t=0$$, and the expected advantage terms are equal, as the
+distribution of $$s_t$$ will then be identical for both policies:
+
+$$
+\mathbb{E}_{s_t \sim \pi \| n_t=0}[\bar{A}(s_t)] = \mathbb{E}_{s_t \sim \tilde{\pi} \| n_t=0}[\bar{A}(s_t)]
+$$
+
+This leaves the terms where $$n_t > 0$$:
+
+\begin{equation} \label{pnt-and-difference}
+\mathbb{E}\_{s\_t \sim \tilde{\pi}}[\bar{A}(s\_t)] - \mathbb{E}\_{s\_t \sim \pi}[\bar{A}(s\_t)]
+= P(n\_t>0) \left( \mathbb{E}\_{s_t \sim \tilde{\pi} \| n\_t>0}[\bar{A}(s\_t)] - \mathbb{E}_{s\_t \sim \pi \| n\_t>0}[\bar{A}(s\_t)]
+\right)
+\end{equation}
+
+Since $$\pi$$ and $$\tilde{\pi}$$ are $$\alpha$$-coupled policies, for their actions to agree at each time step up to $$ t $$,
+this will happen with probability at least:
+
+$$ P(n_t=0) \geq (1 - \alpha)^t $$
+
+And so:
+
+\begin{equation}\label{pnt-bound} 
+P(n>0) \leq 1- (1 - \alpha)^t 
+\end{equation}
+
+We can re-use the same idea as in (\ref{simple-bound}) to bound the 2nd term on the RHS of (\ref{pnt-and-difference}):
+\begin{equation}\label{pnt-and-difference-2}
+\left( \mathbb{E}\_{s_t \sim \tilde{\pi} \| n\_t>0}[\bar{A}(s\_t)] - \mathbb{E}_{s\_t \sim \pi \| n\_t>0}[\bar{A}(s\_t)]
+\right) \leq 4 \alpha \max\_{s, a} \| A\_{\pi}(s,a) \|
+\end{equation}
+
+Putting (\ref{pnt-bound}) and(\ref{pnt-and-difference-2}) into (\ref{pnt-and-difference}) gives us the result we're looking for:
+
+\begin{equation}\label{tighter-bound}
+\| \mathbb{E}\_{s_t \sim \tilde{\pi}}[\bar{A}(s)] - \mathbb{E}\_{s_t \sim \pi}[\bar{A}(s)] \| \leq 
+4 \alpha (1- (1 - \alpha)^t) \max\_{s, a} \| A\_{\pi}(s,a) \|
+\end{equation}
+
+## Putting it all Together
+
+To get to our final result - the MIGT - we will use \ref{tighter-bound} to bound $$L_{\pi}(\tilde{\pi}) - \eta(\tilde{\pi})$$.
+Defining $$ \epsilon =  \max_{s, a} \| A_{\pi}(s,a) \| $$
+
+$$
+\| L_{\pi}(\tilde{\pi}) - \eta(\tilde{\pi}) \| = 
+\sum_{t=0}^{\infty} {\gamma^t} \| \mathbb{E}_{s_t \sim \tilde{\pi}}[\bar{A}(s)] - \mathbb{E}_{s_t \sim \pi}[\bar{A}(s)] \| \\
+\leq \sum_{t=0}^{\infty} {\gamma^t} \cdot 4 \epsilon \alpha (1 - (1-\alpha)^t) \\
+= 4 \epsilon \alpha (\frac{1}{1-\gamma} - \frac{1}{1 - \gamma(1-\alpha)})\\
+= \frac{4 \epsilon \alpha^2 \gamma}{(1-\gamma)(1 - \gamma(1-\alpha))} \\
+\leq \frac{4 \epsilon \alpha^2 \gamma}{(1-\gamma)^2}
+$$
+
+And finally, we can also replace $$\alpha$$ with the total variation divergence $$D_{TV}$$ as we have done when discussing
+$$\alpha$$-coupled policies:
+
+$$
+\alpha = \max_s D_{TV}(\pi(.\|s) \| \tilde{\pi}(.\|s))
+$$
+
+Taken together, we can see that this identity gives us a lower bound that can be used as a proxy function to optimize 
+the true objective $$\eta(\tilde{\pi})$$. 
+
+\begin{equation} \label{MIGT}
+\eta(\tilde{\pi}) \leq L_{\pi}(\tilde{\pi}) - \frac{4 \epsilon \alpha^2 \gamma}{(1-\gamma)^2}
+\end{equation}
+
+This reminds me a lot of the ELBO lower bound used in the EM algorithm and many variational learning techniques:
+
+\begin{equation}
+\log p(\textbf{X} \| \boldsymbol{\theta}) 
+\leq \sum\_{\textbf{Z}} q(\textbf{Z} \| \textbf{X}) \log \left[ p(\textbf{X} \| \textbf{Z}, \boldsymbol{\theta}\) ) \right] + 
+KL(q(\textbf{Z} \| \textbf{X}) \| p(\textbf{Z}))
+\end{equation}
+
+The LHS of the above equation is the true objective - the marginal log-likelihood of a latent variable model with 
+observed variable $$\textbf{X}$$ and latent variable $$\textbf{Z}$$. The RHS of the equation is a surrogate - the ELBO 
+($$\text{ELBO}(q, \boldsymbol{\theta})$$), which is a functional of the variational posterior $$q$$, which is a variable
+we want to optimize.
+
+This is very similar to the structure of the local approximation $$L_{\pi}(\tilde{\pi})$$ which is also a lower bound to 
+the true objective, and a functional of a function $$\tilde{\pi}$$ that we wish to optimize. In fact the authors have
+noted that they are related in the sense that both belong to a class of algorithms called [_minorization-maximization 
+(MM) algorithms_](http://yaroslavvb.com/papers/hunter-tutorial.pdf).
+
+
+## Conclusion
+
+Phew! That was _a lot_ of work to get to this one simple result! But our work still isn't done yet, this bound, while
+insightful, is still difficult to optimize due to the $$ \epsilon =  \max_{s, a} \| A_{\pi}(s,a) \| $$ term in there.
+Moreover, even if we could compute and optimize the bound, the step-sizes taken would be very small indeed, as noted by
+the authors. In order to make use of this result, several modifications and approximations need to be made. We'll cover
+this in the next part.

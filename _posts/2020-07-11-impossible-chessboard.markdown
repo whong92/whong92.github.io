@@ -8,7 +8,7 @@ classes: wide
 categories: math 
 ---
 
-Recently one of my favorite yotube channels [3Blue1Brown](https://www.youtube.com/channel/UCYO_jab_esuFRV4b17AJtAw) posted a video on the [Impossible Chessboard Puzzle](https://www.youtube.com/watch?v=wTJI_WuZSwE), (a link is included below). Here I will briefly try to explain what the original game is all about, and how its unsolvable for most cases. I also present an alternative game (with a very tiny change) that is (probably) solvable for all $$N$$. A [program I wrote](https://gist.github.com/whong92/c99088fbb5928b8af52b1d85514bebd1) also solves the game using a recursive backtracking search strategy.
+One of my favorite creators on youtube on the channel [3Blue1Brown](https://www.youtube.com/channel/UCYO_jab_esuFRV4b17AJtAw) posted a video on the [Impossible Chessboard Puzzle](https://www.youtube.com/watch?v=wTJI_WuZSwE), (a link is included below). Here I will briefly try to explain what the original game is all about, and how its unsolvable for most cases. I also present an alternative game (with a very tiny change) that is (probably) solvable for all $$N$$. A [program I wrote](https://gist.github.com/whong92/c99088fbb5928b8af52b1d85514bebd1) also solves the game using a recursive backtracking search strategy.
 
 ## The Original Game
 
